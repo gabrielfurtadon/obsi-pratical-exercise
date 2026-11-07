@@ -1,0 +1,6 @@
+target/
+.idea/
+*.iml
+# Assessment brief PDF (notes from it are in docs/brief.md)
+*.pdf
+.claude/settings.local.json

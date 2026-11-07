@@ -1,0 +1,5 @@
+# Byte-exact files: no line-ending conversion (the spec hash and golden outputs depend on it).
+obsi-methodology.md -text
+src/test/resources/expected/** -text
+*.sh text eol=lf
+mvnw text eol=lf
