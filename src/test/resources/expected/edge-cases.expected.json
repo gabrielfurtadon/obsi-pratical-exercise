@@ -1,0 +1,10 @@
+{
+  "index": "OBSI",
+  "calculationTime": "2026-11-07T12:00:00Z",
+  "status": "published",
+  "value": "100.03",
+  "metadata": {
+    "utilizedDepth": "6",
+    "excludedExchanges": ["Delta", "Echo"]
+  }
+}

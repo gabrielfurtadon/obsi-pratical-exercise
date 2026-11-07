@@ -3,3 +3,4 @@ obsi-methodology.md -text
 src/test/resources/expected/** -text
 *.sh text eol=lf
 mvnw text eol=lf
+*.xlsx binary
