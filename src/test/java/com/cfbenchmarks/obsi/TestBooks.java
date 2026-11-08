@@ -73,6 +73,14 @@ public final class TestBooks {
         return valid(name, m.subtract(HALF_SPREAD).toPlainString(), m.add(HALF_SPREAD).toPlainString());
     }
 
+    /** Levels written as {@code "price:size"}, in the order given. */
+    public static List<Level> levels(String... priceColonSize) {
+        return java.util.Arrays.stream(priceColonSize).map(s -> {
+            String[] parts = s.split(":");
+            return lv(parts[0], parts[1]);
+        }).toList();
+    }
+
     public static Snapshot snapshot(BookInput... books) {
         return new Snapshot(TIME, List.of(books));
     }

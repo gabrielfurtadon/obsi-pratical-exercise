@@ -166,6 +166,40 @@ an example. Open were the wording for the other cases, and what to do with a fai
   failure.
 - Status: Decided (resolved by the user)
 
+### D-21 Empty Eq. 2 set: reasons, weight arithmetic, and a scan that stops at the first crossing
+§6 says the calculation fails when the Eq. 2 set is empty and names two cases ("insufficient depth to
+evaluate consecutive samples" and "no mid-spread cutoff crossing before either curve ends"). D-08 gives only
+the second as an example string. D-13 and D-14 fix the numeric types but not the order of operations. Eq. 2
+takes a maximum over every sample, which on a deep book is a long walk.
+- Spec: §4 Eq. 1a-1f, §5 Eq. 2 and Eq. 3, §6; D-08, D-13, D-14.
+- Decision:
+  - Reasons. `empty Eq. 2 set: insufficient depth to evaluate consecutive samples` when fewer than two
+    whole-unit samples (s = 1) are defined on both curves. `empty Eq. 2 set: no mid-spread crossing before a
+    curve ends` for every other empty set, including a book that is already above D at v = 1.
+  - Weight arithmetic. lambda = 1 / (0.3 · v_T) is a BigDecimal division at DECIMAL128, converted to double once.
+    Each weight lambda·e^(-lambda·v) is computed in double with `StrictMath.exp` and converted exactly with
+    `new BigDecimal(double)`. The numerator Σ midPV(v)·weight and NF are exact BigDecimal sums, followed by one
+    DECIMAL128 division. The result is rounded once, HALF_UP, to two decimals. The cutoff is tested without
+    division as `askPV <= (1 + D) · midPV`, and "equal" counts as within.
+  - Monotonicity. midSV(v) = askPV/midPV - 1 = (a - b) / (a + b) for the ask a and bid b at volume v. This
+    increases with a and decreases with b. As v grows the ask never falls and the bid never rises (the
+    consolidated asks are ascending and the bids descending), so midSV never decreases from one sample to the
+    next. Hence the samples with midSV <= D form a prefix, and the Eq. 2 set has at most one element: the last
+    sample of that prefix, if the next sample is defined and above D. Eq. 2 takes the maximum of a set with at
+    most one element, so it is that element.
+  - The scan stops at the first crossing, and stops at once if v = 1 is already above D, because no later
+    sample can be within D. This equals the literal maximum, and its cost depends on v_T and not on the depth of
+    the book. `UtilizedDepth.find` does this. A test keeps the literal full scan of Eq. 2, with real division at
+    60 digits, as an oracle and compares the two on 500 random books (`IndexPropertyTest`). A second test checks
+    the monotonicity premise on the same books.
+- Rationale: the two reasons follow §6's two bullets, so a reader can tell a thin book from a wide one. Summing
+  before the single division keeps a constant midPV exact, which matters at an x.xx5 rounding boundary. Stopping
+  early is provably equal to the literal maximum, so the spec is not changed, and a book with a very large size
+  no longer costs time proportional to that size.
+- Not covered: a book that stays within D over a very large depth is still walked to its end before it fails;
+  that is inherent to "no crossing before a curve ends". Listed as a production gap for the README.
+- Status: Decided (resolved by the user)
+
 ## Output and CLI
 
 ### D-08 Exit codes and `reason`
