@@ -58,6 +58,14 @@ run allow Bash command "./mvnw -q test -DexcludedGroups=wip"
 run allow Bash command "git commit -m 'update expected values'"
 run allow Bash command "echo hi > /tmp/x.txt"
 run allow Bash command "sha256sum obsi-methodology.md && git log --oneline 2>&1 | head -1"
+# A cd target alone is not a protected reference, even when it is the project root (an ancestor of the
+# spec); anything destructive aimed at the root, or at a directory above the protected paths, stays denied.
+run allow Bash command "cd $ROOT && ./mvnw test"
+run allow Bash command "cd $ROOT && ./mvnw -q test -DexcludedGroups=slow,wip 2>&1 | tail -5"
+run deny  Bash command "rm -rf $ROOT"
+run deny  Bash command "cd $ROOT && rm -rf src/test"
+run deny  Bash command "cd src/test && rm -rf resources"
+run deny  Bash command "cd $ROOT && rm -rf ."
 run deny  Bash command "cat x &> obsi-methodology.md"
 run deny  Bash command "ls $E 2>&1 && rm $E/a.json"
 

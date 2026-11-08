@@ -127,6 +127,23 @@ the unpadded name.
 - Rationale: one definition of "space" for both rules, instead of two that disagree on non-ASCII spaces.
 - Status: Decided (resolved by the user)
 
+### D-19 Reason text when no book survives screening
+D-08 gave `no constituent book survived screening (all excluded by PED)` as an example and D-12 says the
+reason must say when the exclusions were by PED. Open were what triggers the PED wording when structural
+and PED exclusions are mixed, and what the reason is when PED did not cause the failure.
+- Spec: §6 "if no constituent book survives screening". D-12 ("every structurally valid book is
+  excluded by PED").
+- Decision: D-12's reading.
+  - If at least one book was structurally valid and every structurally valid book was excluded by PED,
+    the reason is `no constituent book survived screening (every structurally valid book was excluded by
+    PED)`. Other books excluded structurally do not change this, so it covers both two books at 100 and
+    120 alone and the same two plus an unreadable book.
+  - If no book was structurally valid (all books unreadable, with an empty side or crossed), or `books`
+    is empty, PED never ran and the reason is `no constituent book survived screening`, with no suffix.
+- Rationale: the PED suffix explains the failure when PED is what removed the last candidates.
+  Structural exclusions are reported separately in `excludedExchanges` and are not the deciding cause.
+- Status: Decided (resolved by the user)
+
 ## Output and CLI
 
 ### D-08 Exit codes and `reason`
@@ -138,7 +155,7 @@ the wording of `reason`.
   - `Main` catches every exception, so a failure always produces the failure JSON, never a stack trace.
   - `reason` is short, stable and specific, prefixed by its kind, e.g.
     `input error: books must be an array`,
-    `no constituent book survived screening (all excluded by PED)`,
+    `no constituent book survived screening (every structurally valid book was excluded by PED)`,
     `uncrossing exhausted the ask side`,
     `empty Eq. 2 set: no mid-spread crossing before a curve ends`.
 - Rationale: distinct codes let a caller tell bad data from a legitimate no-publish without parsing

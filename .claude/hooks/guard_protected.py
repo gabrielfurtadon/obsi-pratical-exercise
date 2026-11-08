@@ -3,7 +3,9 @@
 
 Covers file tools (Edit, Write, MultiEdit, NotebookEdit) and Bash. For Bash, any command that
 references a protected path (or an ancestor directory, or a glob that could match one) is only
-allowed when every segment is a known read-only command and there is no output redirection.
+allowed when every segment is a known read-only command and there is no output redirection. The
+target of a `cd` does not count as a reference merely because it is an ancestor (so
+`cd <root> && ./mvnw test` is fine); `cd` is followed, so later relative paths resolve against it.
 
 This is a guardrail against accidents, not a security boundary: it does not interpret shell
 variables, eval, scripts in other languages, or git commands that rewrite the work tree
@@ -73,21 +75,44 @@ def words(text):
         return text.split()
 
 
+def cd_target(argv):
+    """The directory a `cd` segment changes to, or None if this segment is not a plain cd."""
+    if not argv or os.path.basename(argv[0]) != "cd":
+        return None
+    return next((a for a in argv[1:] if not a.startswith("-")), "")
+
+
 def references_protected(command, cwd, root):
     if "obsi-methodology" in command or "expected/" in command:
         return True
     rel_forms = [SPEC, EXPECTED, "expected", "resources/expected", "test/resources/expected"]
-    for raw in words(command):
-        for tok in {raw, raw.lstrip("<>&|0123456789"), raw.split("=", 1)[-1]}:
-            if not tok:
-                continue
-            if os.path.basename(tok.rstrip("/")) in ("expected", SPEC):
-                return True
-            if any(c in tok for c in "*?[") and any(fnmatch.fnmatch(f, tok) for f in rel_forms):
-                return True
-            full = tok if os.path.isabs(tok) else os.path.join(cwd, tok)
-            if os.path.exists(full) and (is_protected(full, root) or is_ancestor_of_protected(full, root)):
-                return True
+    # Walk the command one segment at a time so a `cd` is followed: later relative paths resolve
+    # against the directory it moved to. A cd target is only a reference when it is a protected path
+    # itself. Being an ancestor of one (such as the project root in `cd <root> && ./mvnw test`) is not,
+    # because cd alone changes nothing. Any other token that is an ancestor still counts, so
+    # `rm -rf <root>` stays denied.
+    here = cwd
+    for segment in SEGMENT_SPLIT.split(re.sub(r"\d*[<>]&\d+|&>>?", " ", command)):
+        argv = words(segment.strip())
+        target = cd_target(argv)
+        for raw in argv:
+            is_cd_target = target is not None and raw == target
+            for tok in {raw, raw.lstrip("<>&|0123456789"), raw.split("=", 1)[-1]}:
+                if not tok:
+                    continue
+                if os.path.basename(tok.rstrip("/")) in ("expected", SPEC):
+                    return True
+                if any(c in tok for c in "*?[") and any(fnmatch.fnmatch(f, tok) for f in rel_forms):
+                    return True
+                full = tok if os.path.isabs(tok) else os.path.join(here, tok)
+                if os.path.exists(full) and (
+                        is_protected(full, root)
+                        or (is_ancestor_of_protected(full, root) and not is_cd_target)):
+                    return True
+        if target:
+            moved = target if os.path.isabs(target) else os.path.join(here, target)
+            if os.path.isdir(moved):
+                here = moved
     return False
 
 

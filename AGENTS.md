@@ -11,6 +11,7 @@
 - Write tests before code. A test written ahead of its implementation gets `@Tag("wip")`. Remove the tag once it passes.
 - Property-style tests: JUnit `@ParameterizedTest` with inputs from a `java.util.Random` with a fixed seed, so every run is deterministic. No property-testing library.
 - Fast tests: `./mvnw -q test -DexcludedGroups=slow,wip`. Full suite: `./build.sh`. The Stop hook runs `verify -DexcludedGroups=wip`.
+- If a hook blocks a command, stop and report it. Don't rewrite the command to get around the block.
 
 ## I/O
 - Results go to stdout as JSON. Errors go to stderr as JSON. Nothing else goes to stdout.
