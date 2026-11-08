@@ -144,6 +144,28 @@ and PED exclusions are mixed, and what the reason is when PED did not cause the 
   Structural exclusions are reported separately in `excludedExchanges` and are not the deciding cause.
 - Status: Decided (resolved by the user)
 
+### D-20 Uncrossing cannot exhaust a side after §2; reasons for the failure
+§3 and §6 fail the calculation when uncrossing exhausts a side, and D-08 only gives the ask-side reason as
+an example. Open were the wording for the other cases, and what to do with a failure that cannot occur.
+- Spec: §3 ¶2 "The calculation fails if either side is exhausted"; §6; §2 (best bid < best ask per book).
+- Finding: after the §2 screens the failure is unreachable. Every surviving book has best bid < best ask,
+  so every bid level is strictly below its own book's best ask, which is at most the highest consolidated
+  ask. No bid is ever at or above the highest ask level, so that level is never consumed and the ask side
+  is never exhausted. Symmetrically, every ask level is strictly above its own book's best bid, which is at
+  least the lowest consolidated bid, so the lowest bid level is never consumed. This holds for any number
+  of books, sizes and rounds. `ConsolidatorPropertyTest` checks it on 400 random snapshots.
+- Decision:
+  - The failure branch is kept as the spec requires. `Consolidator.uncross(bids, asks)` is package-private
+    so that the branch is tested with sides built by hand, since no valid book reaches it.
+  - The reasons are `uncrossing exhausted the bid side`, `uncrossing exhausted the ask side`, and
+    `uncrossing exhausted both sides` when the last crossing empties both at once.
+  - An empty survivor list passed to `Consolidator.consolidate` is a caller bug and throws
+    `IllegalArgumentException`. The screener fails with §6 before it would pass one on.
+- Rationale: the spec requires the check even though §2 makes it unreachable, so the code follows the spec
+  and says why it cannot fire. Naming the side that was exhausted costs nothing and helps whoever reads the
+  failure.
+- Status: Decided (resolved by the user)
+
 ## Output and CLI
 
 ### D-08 Exit codes and `reason`

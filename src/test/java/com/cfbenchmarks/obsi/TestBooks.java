@@ -60,6 +60,13 @@ public final class TestBooks {
                 new BigDecimal(bid), new BigDecimal(ask));
     }
 
+    /** A structurally valid book with the given levels; the best prices are taken from the levels (D-11). */
+    public static ValidBook validBook(String name, List<Level> bids, List<Level> asks) {
+        BigDecimal bestBid = bids.stream().map(Level::price).max(BigDecimal::compareTo).orElseThrow();
+        BigDecimal bestAsk = asks.stream().map(Level::price).min(BigDecimal::compareTo).orElseThrow();
+        return new ValidBook(name, bids, asks, bestBid, bestAsk);
+    }
+
     /** A structurally valid book whose mid is exactly {@code mid}, with a spread of 0.2. */
     public static ValidBook validAtMid(String name, String mid) {
         BigDecimal m = new BigDecimal(mid);

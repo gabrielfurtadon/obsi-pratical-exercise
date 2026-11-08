@@ -137,6 +137,11 @@ def check_bash(command, cwd, root):
     if not references_protected(command, cwd, root):
         return
     for target in REDIRECT.findall(command):
+        # `\S*` also takes a command separator glued to the target ("2>/dev/null;", "2>/dev/null)",
+        # "2>/dev/null|head"). The target ends at the first separator, so cut there before comparing. A real
+        # target keeps its name. An fd duplication such as "&1" is left alone.
+        if not target.startswith("&"):
+            target = re.split(r"[;|&)`]", target, maxsplit=1)[0]
         if target not in ("/dev/null",) and not re.fullmatch(r"&\d|\d", target or "x"):
             deny("Bash command references the spec or src/test/resources/expected/ and contains "
                  "an output redirection. Those files must never be modified (see AGENTS.md).")

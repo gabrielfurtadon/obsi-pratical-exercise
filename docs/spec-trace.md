@@ -15,14 +15,14 @@ One row per clause of `obsi-methodology.md`, plus the I/O contract and `--new-pe
 | 1.6 | §1 | m_{T,e} is the top-of-book mid, determined before consolidation | `book/ValidBook.mid` (exact; D-14) | `ValidBookTest`, `ScreenerTest` |
 | 1.7 | §1 | Median is of structurally valid book mids; mean of middle two when count is even | `deviation/StaticPedFilter.median` over the structurally valid books only (`screening/Screener`) | `StaticPedFilterTest`, `ScreenerTest` (crossed, unreadable and empty-side books don't count) |
 | 1.8 | §1 | PED is compared with the 5% limit | `deviation/StaticPedFilter.deviatesMoreThanTheLimit` | `StaticPedFilterTest`, `StaticPedFilterPropertyTest` |
-| 1.9 | §1 | A_T: consolidated asks, ascending price, raw uncapped sizes | TBD | TBD |
-| 1.10 | §1 | B_T: consolidated bids, descending price, raw uncapped sizes | TBD | TBD |
+| 1.9 | §1 | A_T: consolidated asks, ascending price, raw uncapped sizes | `book/ConsolidationResult.Consolidated.asks` (built by `book/Consolidator`; sizes summed, never capped) | `ConsolidatorTest`, `ConsolidatorPropertyTest` |
+| 1.10 | §1 | B_T: consolidated bids, descending price, raw uncapped sizes | `book/ConsolidationResult.Consolidated.bids` (built by `book/Consolidator`; sizes summed, never capped) | `ConsolidatorTest`, `ConsolidatorPropertyTest` |
 | 1.11 | §1 | v_T is determined by Eq. 2 | TBD | TBD |
 | 1.12 | §1 | λ = 1/(0.3·v_T) | TBD | TBD |
 | 1.13 | §1 | NF is the sum of weights through v_T | TBD | TBD |
 | 1.14 | §1 | Prices are USD per XYZ; sizes and depths are in XYZ | TBD | TBD |
-| 1.15 | §1 | A_T and B_T are the levels remaining after screens, consolidation and uncrossing | TBD | TBD |
-| 1.16 | §1 | No order size cap applies | TBD | TBD |
+| 1.15 | §1 | A_T and B_T are the levels remaining after screens, consolidation and uncrossing | `book/Consolidator.consolidate` on the screener's survivors (screens: rows 2.x; consolidation and uncrossing: rows 3.x) | `ConsolidatorTest` (sample and edge-cases fixtures end to end) |
+| 1.16 | §1 | No order size cap applies | `book/Consolidator` (no cap anywhere; sizes are summed and reduced exactly) | `ConsolidatorTest` (the consolidated sizes are the raw sums, e.g. 99.8 → 2.3); the curve and index steps are not built yet |
 | 2.1 | §2 | Discard a price/size entry if either component is not numeric (D-01, D-05) | `input/InputParser.readLevels` (implements this clause fully: only JSON numbers are numeric; "strictly positive" is row 2.2, phase 2) | `InputParserTest` |
 | 2.2 | §2 | Discard a price/size entry if either component is not strictly positive | `screening/BookScreen.strictlyPositive` | `EntryScreenTest`, `ScreenerPropertyTest` |
 | 2.3 | §2 | Exclude a book if its structure cannot be read (D-03, D-06) | `input/InputParser.readBook` yields `UnreadableBook`; `screening/Screener` excludes it | `InputParserTest`, `BookScreenTest` |
@@ -38,13 +38,13 @@ One row per clause of `obsi-methodology.md`, plus the I/O contract and `--new-pe
 | 2.13 | §2 | A book at exactly 5% passes | `deviation/StaticPedFilter.deviatesMoreThanTheLimit` (equal passes) | `StaticPedFilterTest` (exact ±5% incl. cases where double arithmetic fails), `ScreenerFixturesTest` |
 | 2.14 | §2 | Deviation check per snapshot, using only that snapshot's books | `deviation/StaticPedFilter` (stateless; judges only the books it is given) | `StaticPedFilterTest` |
 | 2.15 | §2 | No reentry state and no half-limit test | `deviation/StaticPedFilter` (no state, no half-limit) | `StaticPedFilterTest` |
-| 3.1 | §3 | Combine the surviving books into one book | TBD | TBD |
-| 3.2 | §3 | Sum sizes at identical bid prices and, separately, at identical ask prices | TBD | TBD |
-| 3.3 | §3 | Order bids highest to lowest and asks lowest to highest | TBD | TBD |
-| 3.4 | §3 | While best bid ≥ best ask, subtract the smaller of their sizes from both levels | TBD | TBD |
-| 3.5 | §3 | Remove every level whose residual size becomes zero | TBD | TBD |
-| 3.6 | §3 | Repeat until best bid < best ask | TBD | TBD |
-| 3.7 | §3 | Calculation fails if either side is exhausted | TBD | TBD |
+| 3.1 | §3 | Combine the surviving books into one book | `book/Consolidator.consolidate` (flattens every survivor's levels; an empty list is a caller bug, D-20) | `ConsolidatorTest` (sample, edge-cases, empty list) |
+| 3.2 | §3 | Sum sizes at identical bid prices and, separately, at identical ask prices (D-11) | `book/Consolidator.uncross` (`TreeMap.merge` with `BigDecimal::add`; `compareTo` keys, so 100.0 and 100 merge) | `ConsolidatorTest` (scales, same book and across books, 0.1 + 0.2, bid and ask at one price stay separate), `ConsolidatorPropertyTest` |
+| 3.3 | §3 | Order bids highest to lowest and asks lowest to highest | `book/Consolidator.uncross` (bids `TreeMap` in reverse natural order, asks in natural order) | `ConsolidatorTest`, `ConsolidatorPropertyTest` (strict order, input order irrelevant) |
+| 3.4 | §3 | While best bid ≥ best ask, subtract the smaller of their sizes from both levels | `book/Consolidator.uncross` (`compareTo(...) >= 0`; `min` of the two sizes) | `ConsolidatorTest` (equal price, unequal sizes, several rounds, edge-cases fixture at 104.9 / 100.05), `ConsolidatorPropertyTest` (equal volume removed from both sides); mutation-checked (`>=` to `>`, `min` to `max`) |
+| 3.5 | §3 | Remove every level whose residual size becomes zero | `book/Consolidator.reduce` (`signum() == 0`, so a residual of `0.0` goes too) | `ConsolidatorTest` (zero residual at a different scale), `ConsolidatorPropertyTest` (all sizes positive); mutation-checked (`equals(ZERO)` loops forever, caught by the suite-wide 10 s timeout) |
+| 3.6 | §3 | Repeat until best bid < best ask | `book/Consolidator.uncross` (loop condition) | `ConsolidatorTest`, `ConsolidatorPropertyTest` (best bid below best ask) |
+| 3.7 | §3 | Calculation fails if either side is exhausted (D-20: unreachable after §2) | `book/Consolidator.uncross` returns `ConsolidationResult.Failed` (bid, ask or both sides) | `ConsolidatorTest` (hand-built sides), `ConsolidatorPropertyTest` (valid books never fail) |
 | 4.1 | §4 Eq. 1a | Unspaced askPV(v) = ap_{j+1} where Σ_{i≤j} as_i < v and Σ_{i≤j+1} as_i ≥ v | TBD | TBD |
 | 4.2 | §4 Eq. 1b | Unspaced bidPV(v) = bp_{j+1} where Σ_{i≤j} bs_i < v and Σ_{i≤j+1} bs_i ≥ v | TBD | TBD |
 | 4.3 | §4 | j ≥ 0; an empty sum equals zero | TBD | TBD |
@@ -61,7 +61,7 @@ One row per clause of `obsi-methodology.md`, plus the I/O contract and `--new-pe
 | 5.7 | §5 | Round the published value to 2 dp with Java HALF_UP | TBD | TBD |
 | 6.1 | §6 | Fails for malformed required input | `input/InputParser` returns a typed `Rejected(reason)` (parse part only; the failure JSON and exit code are phase 5) | `InputParserTest` |
 | 6.2 | §6 | Fails if no constituent book survives screening (D-12) | `screening/Screener` returns `ScreeningResult.Failed` (reasons per D-12, D-19; failure JSON and exit code are phase 5) | `ScreenerTest` |
-| 6.3 | §6 | Fails if uncrossing exhausts either side | TBD | TBD |
+| 6.3 | §6 | Fails if uncrossing exhausts either side | `book/Consolidator.uncross` returns `ConsolidationResult.Failed` (reasons per D-08, D-20; failure JSON and exit code are phase 5) | `ConsolidatorTest` |
 | 6.4 | §6 | Fails if the Eq. 2 set is empty: insufficient depth to evaluate consecutive samples | TBD | TBD |
 | 6.5 | §6 | Fails if the Eq. 2 set is empty: no cutoff crossing before either curve ends | TBD | TBD |
 | 6.6 | §6 | Do not publish an index value for a failed snapshot (D-08) | TBD | TBD |
