@@ -7,11 +7,11 @@ One row per clause of `obsi-methodology.md`, plus the I/O contract and `--new-pe
 | P.1 | Preamble | OBSI measures the USD price of XYZ at effective time T, using the books in one captured snapshot | TBD | TBD |
 | P.2 | Preamble | Each snapshot is evaluated independently | TBD | TBD |
 | P.3 | Preamble | Baseline orderbook deviation limit is 5% | TBD | TBD |
-| 1.1 | §1 | T is `calculationTime` in the input (D-07) | TBD | TBD |
+| 1.1 | §1 | T is `calculationTime` in the input (D-07) | `input/InputParser` (read, validated, echoed as given; D-15) | `InputParserTest` |
 | 1.2 | §1 | Spacing s = 1 XYZ | TBD | TBD |
 | 1.3 | §1 | Mid-spread cutoff D = 0.005 (0.5%) | TBD | TBD |
 | 1.4 | §1 | v is cumulative XYZ volume, in multiples of s | TBD | TBD |
-| 1.5 | §1 | Exchange e is one book in the snapshot (D-02) | TBD | TBD |
+| 1.5 | §1 | Exchange e is one book in the snapshot (D-02) | `input/InputParser`, `BookInput` (one book per element; duplicate names rejected; D-16) | `InputParserTest` |
 | 1.6 | §1 | m_{T,e} is the top-of-book mid, determined before consolidation | TBD | TBD |
 | 1.7 | §1 | Median is of structurally valid book mids; mean of middle two when count is even | TBD | TBD |
 | 1.8 | §1 | PED is compared with the 5% limit | TBD | TBD |
@@ -23,14 +23,14 @@ One row per clause of `obsi-methodology.md`, plus the I/O contract and `--new-pe
 | 1.14 | §1 | Prices are USD per XYZ; sizes and depths are in XYZ | TBD | TBD |
 | 1.15 | §1 | A_T and B_T are the levels remaining after screens, consolidation and uncrossing | TBD | TBD |
 | 1.16 | §1 | No order size cap applies | TBD | TBD |
-| 2.1 | §2 | Discard a price/size entry if either component is not numeric (D-01, D-05) | TBD | TBD |
+| 2.1 | §2 | Discard a price/size entry if either component is not numeric (D-01, D-05) | `input/InputParser.readLevels` (implements this clause fully: only JSON numbers are numeric; "strictly positive" is row 2.2, phase 2) | `InputParserTest` |
 | 2.2 | §2 | Discard a price/size entry if either component is not strictly positive | TBD | TBD |
-| 2.3 | §2 | Exclude a book if its structure cannot be read (D-03, D-06) | TBD | TBD |
+| 2.3 | §2 | Exclude a book if its structure cannot be read (D-03, D-06) | `input/InputParser.readBook` yields `UnreadableBook` (parse part only; the exclusion itself is phase 2) | `InputParserTest` |
 | 2.4 | §2 | Exclude a book if either side is empty after entry screening | TBD | TBD |
 | 2.5 | §2 | Exclude a book if its best bid ≥ its best ask (D-11) | TBD | TBD |
 | 2.6 | §2 | Apply these checks to each book before combining exchanges | TBD | TBD |
-| 2.7 | §2 | Malformed top-level input is an input error (D-06) | TBD | TBD |
-| 2.8 | §2 | Missing required top-level fields are an input error (D-07) | TBD | TBD |
+| 2.7 | §2 | Malformed top-level input is an input error (D-06) | `input/InputParser` returns `InputResult.Rejected` (D-15, D-16, D-17) | `InputParserTest`, `InputParserPropertyTest` |
+| 2.8 | §2 | Missing required top-level fields are an input error (D-07) | `input/InputParser` (`calculationTime`, `books`) | `InputParserTest` |
 | 2.9 | §2 | For each structurally valid book, m = (b_best + a_best) / 2 | TBD | TBD |
 | 2.10 | §2 | Median of those mids; average middle two for an even number of books | TBD | TBD |
 | 2.11 | §2 | PED = 100·\|m − median\| / median % | TBD | TBD |
@@ -59,7 +59,7 @@ One row per clause of `obsi-methodology.md`, plus the I/O contract and `--new-pe
 | 5.5 | §5 | NF = Σ_{v ∈ {s, 2s, …, v_T}} λe^{−λv} (D-13, D-14) | TBD | TBD |
 | 5.6 | §5 Eq. 3 | OBSI = Σ_{v ∈ {s, …, v_T}} midPV(v)·λe^{−λv} / NF | TBD | TBD |
 | 5.7 | §5 | Round the published value to 2 dp with Java HALF_UP | TBD | TBD |
-| 6.1 | §6 | Fails for malformed required input | TBD | TBD |
+| 6.1 | §6 | Fails for malformed required input | `input/InputParser` returns a typed `Rejected(reason)` (parse part only; the failure JSON and exit code are phase 5) | `InputParserTest` |
 | 6.2 | §6 | Fails if no constituent book survives screening (D-12) | TBD | TBD |
 | 6.3 | §6 | Fails if uncrossing exhausts either side | TBD | TBD |
 | 6.4 | §6 | Fails if the Eq. 2 set is empty: insufficient depth to evaluate consecutive samples | TBD | TBD |
@@ -82,17 +82,17 @@ Clauses from `docs/brief.md` that the code must follow; the spec doesn't define 
 | C.1 | Brief CLI | Java 25; takes one local JSON path (D-10) | TBD | TBD |
 | C.2 | Brief CLI | `./run.sh data/sample-input.json` and `./run.sh --new-ped data/new-ped.json` work offline with only Java 25, after `build.sh` | TBD | TBD |
 | C.3 | Brief CLI | `build.sh` runs first and leaves everything ready for `run.sh` | TBD | TBD |
-| I.1 | Brief Input | `calculationTime`: ISO-8601 UTC, time of the snapshot (D-07) | TBD | TBD |
-| I.2 | Brief Input | `exchange`: unique, nonempty (D-02, D-03) | TBD | TBD |
-| I.3 | Brief Input | `bids` / `asks`: `[[price, size], ...]`; price USD per XYZ, size XYZ, both positive JSON numbers (D-01, D-05) | TBD | TBD |
-| O.1 | Brief Output | Success: one JSON object on stdout, exit 0 | TBD | TBD |
-| O.2 | Brief Output | Success fields: `index` = `"OBSI"`, `calculationTime` same as input, `status` = `"published"`, `value`, `metadata` | TBD | TBD |
+| I.1 | Brief Input | `calculationTime`: ISO-8601 UTC, time of the snapshot (D-07) | `input/InputParser.isUtcInstant` (D-15) | `InputParserTest` |
+| I.2 | Brief Input | `exchange`: unique, nonempty (D-02, D-03) | `input/InputParser` (blank and duplicate checks; D-16, D-18) | `InputParserTest` |
+| I.3 | Brief Input | `bids` / `asks`: `[[price, size], ...]`; price USD per XYZ, size XYZ, both positive JSON numbers (D-01, D-05) | `input/InputParser.readLevels`: BigDecimal, shape and type only; "positive" is phase 2 | `InputParserTest`, `InputParserPropertyTest` |
+| O.1 | Brief Output | Success: one JSON object on stdout, exit 0 | TBD | `GoldenTest` (`wip` until the calculation exists) |
+| O.2 | Brief Output | Success fields: `index` = `"OBSI"`, `calculationTime` same as input, `status` = `"published"`, `value`, `metadata` | TBD | `GoldenTest` (`wip` until the calculation exists) |
 | O.3 | Brief Output | `value` is a string with two decimals (with 5.7) | TBD | TBD |
 | O.4 | Brief Output | `metadata.utilizedDepth` is a decimal string in XYZ (v_T, 5.1) | TBD | TBD |
 | O.5 | Brief Output | `metadata.excludedExchanges` lists the screened-out exchanges in input order (D-03) | TBD | TBD |
 | O.6 | Brief Output | Failure: one JSON object on stderr, nonzero exit (D-08) | `cli/Main.java` (scaffold) | `MainSmokeTest` |
 | O.7 | Brief Output | Failure fields: `index` = `"OBSI"`, `calculationTime` same as input or null, `status` = `"failed"`, `reason` | `cli/Main.java` (scaffold) | `MainSmokeTest` |
-| O.8 | Brief Output | `calculationTime` is null when the input itself doesn't conform | TBD | TBD |
+| O.8 | Brief Output | `calculationTime` is null when the input itself doesn't conform | `InputResult.Rejected` carries no `calculationTime`, so the CLI (phase 5) reports null (D-07) | `InputParserTest` (rejection cases) |
 | O.9 | Brief Output | The result stays on its own stream; diagnostics go somewhere else (D-09) | TBD | TBD |
 | N.1 | Brief Task 2 | `--new-ped` runs the approach chosen in `proposal.md` | TBD | TBD |
 | N.2 | Brief Task 2 | Without `--new-ped`, the original 5% rule (2.12, 2.13) stays | TBD | TBD |

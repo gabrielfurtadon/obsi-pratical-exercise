@@ -84,6 +84,49 @@ Which top-level fields are required, what format is `calculationTime`, and is it
   would help debugging but reads more into the brief.
 - Status: Decided
 
+### D-15 `calculationTime` must be UTC, not just parseable
+D-07 says "ISO-8601 UTC instant (`Instant.parse`)", but on JDK 25 `Instant.parse` also accepts offsets
+(`2026-10-27T12:00:00+01:00`), a lowercase `z` and `T24:00:00Z`.
+- Spec: §1 (T is `calculationTime`). Brief, "Input": "ISO-8601 UTC".
+- Decision: the value must be a JSON string that `Instant.parse` accepts **and** that ends in an
+  uppercase `Z`. Offsets and a lowercase `z` are an input error. `T24:00:00Z` is still accepted, because
+  `Instant.parse` accepts it. The original string is echoed unchanged (D-07).
+- Rationale: the brief says UTC; the parenthetical in D-07 names the parser, not the whole rule.
+- Status: Decided (resolved by the user during Phase 1 planning; the rationale wording is the agent's)
+
+### D-16 Exchange name: blank and duplicate comparison
+D-02 and D-03 require names to be unique and nonempty, but not how names are compared or whether a
+whitespace-only name is empty.
+- Spec: silent. Brief, "Input": "unique, nonempty".
+- Decision: a name that is empty or whitespace-only (`String.isBlank()`) is an input error. For the
+  duplicate check (D-02), names are compared after `strip()` and `toLowerCase(Locale.ROOT)` (see D-18),
+  so `Kraken`, `kraken` and `Kraken ` are duplicates. Names in the output and in `excludedExchanges` are
+  always kept exactly as given.
+- Rationale: two names that differ only in case or padding are almost certainly the same exchange, and
+  keeping both would double-weight it (D-02). The identifier that is printed is never altered.
+- Status: Decided (resolved by the user during Phase 1 planning; the rationale wording is the agent's)
+
+### D-17 Duplicate keys inside a JSON object
+Jackson resolves a repeated key (two `bids`, two `exchange`) silently as last-wins.
+- Spec: silent. D-04 and D-06 cover unknown fields and malformation, not repeated keys.
+- Decision: a duplicate key in any object is invalid JSON, so the whole document is an input error
+  (Jackson `STRICT_DUPLICATE_DETECTION`).
+- Rationale: general principle: nothing is accepted silently when the integrity of the data is in doubt.
+- Status: Decided (resolved by the user during Phase 1 planning; the rationale wording is the agent's)
+
+### D-18 Whitespace definition in D-16
+D-16 says duplicate names are compared "trimmed", and blank names are rejected. Which characters count as
+whitespace? `trim()` only removes characters up to U+0020, while `isBlank()` (the blank check) uses
+Unicode whitespace, so with `trim()` a name padded with an em space (U+2003) would not be a duplicate of
+the unpadded name.
+- Spec: silent.
+- Decision: the duplicate check uses `strip()` instead of `trim()`. `strip()` and `isBlank()` use the same
+  whitespace definition (`Character.isWhitespace`), so both rules agree on what a space is. `Kraken` and
+  `Kraken` followed by U+2003 are duplicates. U+00A0 (no-break space) is outside that definition for both
+  rules: it is neither stripped nor counted as blank. That is accepted, not handled.
+- Rationale: one definition of "space" for both rules, instead of two that disagree on non-ASCII spaces.
+- Status: Decided (resolved by the user)
+
 ## Output and CLI
 
 ### D-08 Exit codes and `reason`
