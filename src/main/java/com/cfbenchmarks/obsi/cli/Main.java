@@ -1,5 +1,7 @@
 package com.cfbenchmarks.obsi.cli;
 
+import com.cfbenchmarks.obsi.deviation.DeviationFilter;
+import com.cfbenchmarks.obsi.deviation.SpreadBasedPedFilter;
 import com.cfbenchmarks.obsi.deviation.StaticPedFilter;
 import com.cfbenchmarks.obsi.input.InputParser;
 import com.cfbenchmarks.obsi.input.InputResult;
@@ -30,8 +32,6 @@ public final class Main {
     static final int EXIT_INPUT_OR_USAGE = 2;
     static final int EXIT_INTERNAL = 3;
 
-    // D-22: Task 2 is not built yet, so the flag is recognised and refused.
-    static final String NEW_PED_NOT_IMPLEMENTED = "usage error: --new-ped is not implemented yet";
     static final String STDOUT_WRITE_FAILED = "internal error: could not write the result to stdout";
     private static final int INTERNAL_REASON_LIMIT = 200;
 
@@ -47,13 +47,17 @@ public final class Main {
         System.exit(run(args, out, err));
     }
 
-    /** Runs the original 5% rule (no {@code --new-ped} yet). Returns the exit code. */
+    /**
+     * Runs the original 5% rule, or the spread-based rule of Task 2 with {@code --new-ped} (proposal.md). Returns the
+     * exit code.
+     */
     static int run(String[] args, PrintStream out, PrintStream err) {
-        return run(args, out, err, snapshot -> ObsiCalculator.calculate(snapshot, new StaticPedFilter()));
+        return run(args, out, err, null);
     }
 
     /**
-     * @param calculation the calculation to run on an accepted snapshot; a parameter so a test can make it throw
+     * @param calculation the calculation to run on an accepted snapshot, or null for the real one; a parameter so a
+     *                    test can make it throw
      */
     static int run(String[] args, PrintStream out, PrintStream err, Function<Snapshot, CalculationResult> calculation) {
         // Known once the input is accepted; a failure after that point echoes it (D-22).
@@ -65,19 +69,21 @@ public final class Main {
                 return fail(err, null, invalid.reason(), EXIT_INPUT_OR_USAGE);
             }
             CliArgs.Valid arguments = (CliArgs.Valid) parsed;
-            if (arguments.newPed()) {
-                return fail(err, null, NEW_PED_NOT_IMPLEMENTED, EXIT_INPUT_OR_USAGE);
-            }
 
-            // D-06, D-07: an input error has no calculationTime to report.
-            InputResult input = InputParser.parse(arguments.path());
+            // D-06, D-07: an input error has no calculationTime to report. D-04, D-23: unlockEvents is read, and
+            // validated, only with --new-ped.
+            InputResult input = InputParser.parse(arguments.path(), arguments.newPed());
             if (input instanceof InputResult.Rejected rejected) {
                 return fail(err, null, rejected.reason(), EXIT_INPUT_OR_USAGE);
             }
             Snapshot snapshot = ((InputResult.Accepted) input).snapshot();
             calculationTime = snapshot.calculationTime();
 
-            CalculationResult result = calculation.apply(snapshot);
+            // Task 2: without the flag, the original 5% rule is unchanged; with it, the spread-based rule.
+            DeviationFilter filter = arguments.newPed() ? new SpreadBasedPedFilter() : new StaticPedFilter();
+            CalculationResult result = calculation != null
+                    ? calculation.apply(snapshot)
+                    : ObsiCalculator.calculate(snapshot, filter);
             if (result instanceof CalculationResult.Failed failed) {
                 return fail(err, failed.calculationTime(), failed.reason(), EXIT_CALCULATION_FAILED);
             }

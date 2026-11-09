@@ -198,19 +198,83 @@ class MainTest {
         assertFailure(run("--verbose", "data/sample-input.json"), 2, null, "usage error: unknown option --verbose");
     }
 
-    /** Until Task 2 the flag is recognised and refused, wherever it is, and nothing is calculated. */
-    @Test
-    void newPedIsNotImplementedYetBeforeOrAfterThePath() {
-        String reason = "usage error: --new-ped is not implemented yet";
+    // ---------------------------------------------------------------- --new-ped (Task 2; D-22 superseded by D-23)
 
-        assertFailure(run("--new-ped", "data/sample-input.json"), 2, null, reason);
-        assertFailure(run("data/sample-input.json", "--new-ped"), 2, null, reason);
+    /** 25. The flag runs the spread-based rule, before or after the path, once or twice. */
+    @Test
+    void newPedPublishesBeforeOrAfterThePathAndTwiceIsOnce() throws IOException {
+        for (String[] args : new String[][] {
+                {"--new-ped", "data/sample-input.json"},
+                {"data/sample-input.json", "--new-ped"},
+                {"--new-ped", "data/sample-input.json", "--new-ped"}}) {
+            Run run = run(args);
+
+            assertThat(run.exit()).as(String.join(" ", args)).isZero();
+            assertThat(run.err()).isEmpty();
+            assertThat(JSON.readTree(run.out()).get("status").asText()).isEqualTo("published");
+        }
     }
 
-    /** The arguments are checked before the file is read, so the flag is reported even with a bad path. */
+    /** D-23: the flag no longer short-circuits, so a bad path is the usual input error. */
     @Test
-    void newPedIsReportedBeforeTheFileIsRead() {
-        assertFailure(run("--new-ped", "no-such-file.json"), 2, null, "usage error: --new-ped is not implemented yet");
+    void newPedWithAMissingFileIsAnInputError() {
+        assertFailure(run("--new-ped", "no-such-file.json"), 2, null, "input error: cannot read input file");
+    }
+
+    /** 26. On the sample, the spread-based rule gives the same result as the 5% rule (proposal.md). */
+    @Test
+    void newPedOnTheSamplePublishes100Point23AndExcludesGammaAndDelta() throws IOException {
+        Run run = run("--new-ped", "data/sample-input.json");
+
+        JsonNode result = JSON.readTree(run.out());
+        assertThat(run.exit()).isZero();
+        assertThat(result.get("value").asText()).isEqualTo("100.23");
+        assertThat(result.get("metadata").get("excludedExchanges").toString()).isEqualTo("[\"Gamma\",\"Delta\"]");
+    }
+
+    /** 27. D-23: malformed unlockEvents is an input error with the flag and is ignored (D-04) without it. */
+    @Test
+    void malformedUnlockEventsFailWithTheFlagAndAreIgnoredWithout() throws IOException {
+        String malformed = "{\"calculationTime\":\"" + TIME + "\",\"books\":[" + goodBook("A") + "],\"unlockEvents\":{}}";
+        String path = file(malformed).toString();
+
+        assertFailure(run("--new-ped", path), 2, null, "input error: unlockEvents must be an array");
+        Run without = run(path);
+        assertThat(without.exit()).isZero();
+        assertThat(without.err()).isEmpty();
+    }
+
+    // ---------------------------------------------------------------- data/new-ped.json
+
+    /**
+     * 28. data/new-ped.json: sample + an unlock window covering its calculationTime + Epsilon, which the 5% rule keeps
+     * (2.2% from the median) and the unlock band excludes. Only the excluded lists are pinned, not the index value.
+     */
+    @Test
+    void newPedJsonGivesDifferentResultsWithAndWithoutTheFlag() throws IOException {
+        Run without = run("data/new-ped.json");
+        Run with = run("--new-ped", "data/new-ped.json");
+
+        assertThat(without.exit()).isZero();
+        assertThat(with.exit()).isZero();
+        assertThat(without.err()).isEmpty();
+        assertThat(with.err()).isEmpty();
+        assertThat(JSON.readTree(without.out()).get("metadata").get("excludedExchanges").toString())
+                .isEqualTo("[\"Gamma\",\"Delta\"]");
+        assertThat(JSON.readTree(with.out()).get("metadata").get("excludedExchanges").toString())
+                .isEqualTo("[\"Gamma\",\"Delta\",\"Epsilon\"]");
+        assertThat(JSON.readTree(with.out())).isNotEqualTo(JSON.readTree(without.out()));
+    }
+
+    /** 29. The window is what excludes Epsilon: the same file with calculationTime after the window keeps it. */
+    @Test
+    void outsideTheWindowNewPedKeepsEpsilon() throws IOException {
+        String text = Files.readString(Path.of("data/new-ped.json")).replace("2026-10-27T12:00:00Z", "2026-10-29T12:00:00Z");
+        Run run = run("--new-ped", file(text).toString());
+
+        assertThat(run.exit()).isZero();
+        assertThat(JSON.readTree(run.out()).get("metadata").get("excludedExchanges").toString())
+                .isEqualTo("[\"Gamma\",\"Delta\"]");
     }
 
     // ---------------------------------------------------------------- calculation failures (exit 1, calculationTime echoed)

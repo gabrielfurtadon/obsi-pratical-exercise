@@ -73,6 +73,23 @@ public final class TestBooks {
         return valid(name, m.subtract(HALF_SPREAD).toPlainString(), m.add(HALF_SPREAD).toPlainString());
     }
 
+    /**
+     * A structurally valid book whose mid is exactly {@code mid} and whose absolute spread (ask - bid) is exactly
+     * {@code spread}. {@link #validAtMid} always has a spread of 0.2, which at mid 100 is S = 0.2% and so not a floor
+     * case of the spread-based rule; use this one to choose S.
+     */
+    public static ValidBook validWithSpread(String name, String mid, String spread) {
+        BigDecimal m = new BigDecimal(mid);
+        BigDecimal half = new BigDecimal(spread).divide(BigDecimal.valueOf(2));
+        return valid(name, m.subtract(half).toPlainString(), m.add(half).toPlainString());
+    }
+
+    /** A snapshot at {@code time} with the given announced unlock starts (UTC instants as text). */
+    public static Snapshot snapshotAt(String time, String... unlockStarts) {
+        return new Snapshot(time, List.of(),
+                java.util.Arrays.stream(unlockStarts).map(java.time.Instant::parse).toList());
+    }
+
     /** Levels written as {@code "price:size"}, in the order given. */
     public static List<Level> levels(String... priceColonSize) {
         return java.util.Arrays.stream(priceColonSize).map(s -> {
@@ -95,12 +112,20 @@ public final class TestBooks {
 
     /** Parses a fixture under {@code data/}, found by file name wherever it sits below that directory. */
     public static Snapshot fixture(String fileName) throws IOException {
+        return fixture(fileName, false);
+    }
+
+    /**
+     * As {@link #fixture(String)}; with {@code readUnlockEvents} the file is read the way {@code --new-ped} reads it.
+     * Without it the snapshot has no unlock events (D-04), so a filter test on {@code new-ped.json} needs the flag.
+     */
+    public static Snapshot fixture(String fileName, boolean readUnlockEvents) throws IOException {
         Path file;
         try (Stream<Path> files = Files.walk(Path.of("data"))) {
             file = files.filter(p -> p.getFileName().toString().equals(fileName)).findFirst()
                     .orElseThrow(() -> new AssertionError(fileName + " not found under data/"));
         }
-        InputResult result = InputParser.parse(file);
+        InputResult result = InputParser.parse(file, readUnlockEvents);
         if (!(result instanceof InputResult.Accepted accepted)) {
             throw new AssertionError("fixture " + fileName + " was rejected: " + result);
         }

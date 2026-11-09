@@ -39,6 +39,7 @@ public final class InputParser {
             "input error: calculationTime must be an ISO-8601 UTC timestamp ending in Z";
     static final String BOOKS_MISSING = "input error: books is missing";
     static final String BOOKS_NOT_ARRAY = "input error: books must be an array";
+    static final String UNLOCK_NOT_ARRAY = "input error: unlockEvents must be an array";
 
     private static final ObjectMapper JSON = JsonMapper.builder()
             // CLAUDE.md "Numbers": 100.2 must never pass through a double.
@@ -66,8 +67,28 @@ public final class InputParser {
         return parse(bytes);
     }
 
-    /** Parses the UTF-8 bytes of an input document. */
+    /**
+     * As {@link #parse(Path)}, and with {@code readUnlockEvents} also reads the optional {@code unlockEvents} (what
+     * {@code --new-ped} needs). Without it the field is not looked at (D-04); with it a malformed value is an input
+     * error (D-23).
+     */
+    public static InputResult parse(Path file, boolean readUnlockEvents) {
+        byte[] bytes;
+        try {
+            bytes = Files.readAllBytes(file);
+        } catch (IOException | SecurityException e) {
+            return reject(CANNOT_READ);
+        }
+        return parse(bytes, readUnlockEvents);
+    }
+
+    /** Parses the UTF-8 bytes of an input document. {@code unlockEvents} is ignored (D-04). */
     public static InputResult parse(byte[] json) {
+        return parse(json, false);
+    }
+
+    /** As {@link #parse(byte[])}, and with {@code readUnlockEvents} also reads {@code unlockEvents} (D-23). */
+    public static InputResult parse(byte[] json, boolean readUnlockEvents) {
         JsonNode root;
         try {
             root = JSON.readTree(json);
@@ -128,7 +149,45 @@ public final class InputParser {
             }
         }
 
-        return new InputResult.Accepted(new Snapshot(time.textValue(), books));
+        // D-23: checked last, so every other input error keeps its precedence. Without --new-ped the field is not
+        // looked at (D-04).
+        List<Instant> unlockStarts = new ArrayList<>();
+        if (readUnlockEvents) {
+            String problem = readUnlockEvents(root.get("unlockEvents"), unlockStarts);
+            if (problem != null) {
+                return reject(problem);
+            }
+        }
+
+        return new InputResult.Accepted(new Snapshot(time.textValue(), books, unlockStarts));
+    }
+
+    /**
+     * D-23: absent means no unlock; otherwise an array of objects, each with a {@code start} that is a UTC instant
+     * (the D-15 rule). Extra keys in an event are ignored (D-04).
+     *
+     * @param starts receives the {@code start} of every event, in input order
+     * @return the input error reason, or null if the field is well formed
+     */
+    private static String readUnlockEvents(JsonNode events, List<Instant> starts) {
+        if (events == null) {
+            return null;
+        }
+        if (!events.isArray()) {
+            return UNLOCK_NOT_ARRAY;
+        }
+        for (int i = 0; i < events.size(); i++) {
+            JsonNode event = events.get(i);
+            if (!event.isObject()) {
+                return "input error: unlockEvents[" + i + "] must be an object";
+            }
+            JsonNode start = event.get("start");
+            if (start == null || !isUtcInstant(start)) {
+                return "input error: unlockEvents[" + i + "].start must be an ISO-8601 UTC timestamp ending in Z";
+            }
+            starts.add(Instant.parse(start.textValue()));
+        }
+        return null;
     }
 
     /**

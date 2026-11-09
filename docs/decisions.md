@@ -236,6 +236,39 @@ unexpected error reports, and a few wiring details the brief does not cover.
   cannot start with `-`.
 - Status: Decided (resolved by the user)
 
+### D-23 Malformed `unlockEvents` under `--new-ped`
+The Task 2 input gains an optional top-level `unlockEvents: [{"start": "<ISO-8601 UTC>"}]` (proposal.md, "Input
+change"). D-04 says unknown fields are ignored; a malformed calendar must not be silently used.
+- Spec: silent (the field is not in the methodology). Brief, Task 2. D-04, D-06, D-15, D-17.
+- Decision:
+  - Without `--new-ped` the field is not read at all, so a malformed value changes nothing (D-04).
+  - With `--new-ped`: absent or `[]` means no unlock. Anything else must be an array of objects, each with a
+    `start` that is a JSON string passing the D-15 rule (`Instant.parse` accepts it **and** it ends in uppercase
+    `Z`). Otherwise the whole input is an input error: exit 2, `calculationTime` null, reason
+    `input error: unlockEvents must be an array` / `input error: unlockEvents[i] must be an object` /
+    `input error: unlockEvents[i].start must be an ISO-8601 UTC timestamp ending in Z`. `null` and a missing
+    `start` are malformed. Extra keys inside an event are ignored (D-04). Overlapping or duplicate events are
+    fine (the window is their union). Checked after every other input check, so existing input errors keep
+    precedence.
+  - Supersedes the "`--new-ped` is refused until Task 2" bullet of D-22: the flag now runs the filter, and a bad
+    path with the flag is the usual `input error: cannot read input file` (exit 2).
+- Rationale: general principle (nothing accepted silently when the data is in doubt). Silently falling back to
+  the normal band during an announced unlock would apply a looser limit than the PM asked for and publish a
+  different index with no trace; there is no warning channel (D-09). A bad calendar is malformed top-level input
+  (D-06).
+- Alternatives rejected: ignore the bad entry (partial calendar, silent); treat as no unlock (silent, looser).
+- Status: Decided (resolved by the user during planning; the rationale wording is the agent's)
+
+### D-24 Spread-based limit: no rounding, median of spreads
+- Spec: silent (Task 2 only). proposal.md, Approach 2.
+- Decision: the limit k·S is never rounded; "3.99%" in the proposal is a display value. The spread
+  `(ask − bid)/mid` is the only division, at `MathContext.DECIMAL128`; the comparison itself has none. S is the
+  median of the spreads of the structurally valid books, with the same even-count rule as the median of mids
+  (mean of the middle two, exact). The window test uses `Duration.between(start, T) < 48h` rather than
+  `start + 48h`, so it cannot overflow.
+- Rationale: one rounding, at the single division, as D-14 does for the index.
+- Status: Decided (resolved by the user during planning; the rationale wording is the agent's)
+
 ## Output and CLI
 
 ### D-08 Exit codes and `reason`

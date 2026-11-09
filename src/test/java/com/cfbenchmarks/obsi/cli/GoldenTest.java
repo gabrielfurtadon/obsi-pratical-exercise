@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Golden test: the definition of "done" for the whole project. Every input under {@code data/}
  * that has a matching {@code src/test/resources/expected/<name>.expected.json} must produce
  * exactly that JSON tree (compared as parsed JSON, not text), with empty stderr and exit 0.
+ * {@code <name>.new-ped.expected.json} is the same input run with {@code --new-ped}.
  * Inputs without an expected file are skipped.
  */
 class GoldenTest {
@@ -29,21 +30,39 @@ class GoldenTest {
     private static final Path DATA = Path.of("data");
     private static final Path EXPECTED = Path.of("src/test/resources/expected");
     private static final String SUFFIX = ".expected.json";
+    private static final String NEW_PED_SUFFIX = ".new-ped.expected.json";
     // Trailing content after the result is an error: stdout must be exactly one JSON object
     // (CLAUDE.md: "Nothing else goes to stdout").
     private static final ObjectMapper JSON = new ObjectMapper()
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
 
-    /** Pairs of (input, expected) found on disk; the walk is recursive so directory names don't matter. */
-    static Stream<Path[]> goldenPairs() throws IOException {
-        List<Path[]> pairs;
+    /**
+     * One input run in one mode against one expected file. The mode is in the expected file's name:
+     * {@code X.expected.json} is the run without a flag and {@code X.new-ped.expected.json} the run with
+     * {@code --new-ped}, both for {@code data/**}/X.json.
+     */
+    record Pair(Path input, Path expected, boolean newPed) {
+        @Override
+        public String toString() {
+            return (newPed ? "--new-ped " : "") + input;
+        }
+    }
+
+    /** Pairs found on disk, in either mode; the walk is recursive so directory names don't matter. */
+    static Stream<Pair> goldenPairs() throws IOException {
+        List<Pair> pairs = new java.util.ArrayList<>();
         try (Stream<Path> inputs = Files.walk(DATA)) {
-            pairs = inputs
-                    .filter(p -> Files.isRegularFile(p) && p.getFileName().toString().endsWith(".json"))
-                    .sorted()
-                    .map(p -> new Path[] {p, EXPECTED.resolve(stem(p) + SUFFIX)})
-                    .filter(pair -> Files.isRegularFile(pair[1]))
-                    .toList();
+            for (Path p : inputs.filter(f -> Files.isRegularFile(f) && f.getFileName().toString().endsWith(".json"))
+                    .sorted().toList()) {
+                Path plain = EXPECTED.resolve(stem(p) + SUFFIX);
+                Path flagged = EXPECTED.resolve(stem(p) + NEW_PED_SUFFIX);
+                if (Files.isRegularFile(plain)) {
+                    pairs.add(new Pair(p, plain, false));
+                }
+                if (Files.isRegularFile(flagged)) {
+                    pairs.add(new Pair(p, flagged, true));
+                }
+            }
         }
         return pairs.stream();
     }
@@ -55,27 +74,30 @@ class GoldenTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("goldenPairs")
-    void producesTheExpectedResult(Path input, Path expected) throws Exception {
+    void producesTheExpectedResult(Pair pair) throws Exception {
         var out = new ByteArrayOutputStream();
         var err = new ByteArrayOutputStream();
 
-        int exit = Main.run(new String[] {input.toString()},
+        String[] args = pair.newPed()
+                ? new String[] {"--new-ped", pair.input().toString()}
+                : new String[] {pair.input().toString()};
+        int exit = Main.run(args,
                 new PrintStream(out, true, StandardCharsets.UTF_8),
                 new PrintStream(err, true, StandardCharsets.UTF_8));
 
         assertThat(err.toString(StandardCharsets.UTF_8)).as("stderr").isEmpty();
         assertThat(exit).as("exit code").isZero();
         JsonNode actual = JSON.readTree(out.toString(StandardCharsets.UTF_8));
-        assertThat(actual).as("stdout JSON").isEqualTo(JSON.readTree(expected.toFile()));
+        assertThat(actual).as("stdout JSON").isEqualTo(JSON.readTree(pair.expected().toFile()));
     }
 
     /** Guard: a renamed or mistyped file must not turn the golden test into a silent zero-case pass. */
     @Test
     void everyExpectedFileHasAnInputAndSomePairExists() throws IOException {
-        List<Path[]> pairs = goldenPairs().toList();
+        List<Pair> pairs = goldenPairs().toList();
         assertThat(pairs).as("input/expected pairs found").isNotEmpty();
 
-        List<String> paired = pairs.stream().map(pair -> pair[1].getFileName().toString()).toList();
+        List<String> paired = pairs.stream().map(pair -> pair.expected().getFileName().toString()).toList();
         try (Stream<Path> expected = Files.list(EXPECTED)) {
             List<String> orphans = expected
                     .map(p -> p.getFileName().toString())
