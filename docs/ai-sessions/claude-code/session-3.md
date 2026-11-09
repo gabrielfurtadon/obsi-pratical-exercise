@@ -2495,7 +2495,7 @@ e JSON and no stack trace) | `MainTest` (success: empty stderr;
 failure: empty stdout; no stack trace); `./run.sh` checked by
 hand |
 97 -| N.1 | Brief Task 2 | `--new-ped` runs the approach chosen in
--`proposal.md` | TBD | TBD |                                    
+-`../../../proposal.md` | TBD | TBD |                                    
 98 -| N.2 | Brief Task 2 | Without `--new-ped`, the original 5% rul
 -e (2.12, 2.13) stays | `cli/Main` runs `result/ObsiCalculator`
 -with `StaticPedFilter` (the filter is a parameter, so Task 2 on
@@ -2510,36 +2510,36 @@ hand |
 +ly valid book; S = median of the spreads; limit = k·S clamped t
 +o [floor, cap]; exclude if `\|m − median\| > limit·median`; k =
 + 10, normal band [1%, 5%], unlock band [0.5%, 1%], unlock windo
-+w `[start, start + 48h)` (D-23, D-24) | `deviation/SpreadBasedP
+  +w `[start, start + 48h)` (D-23, D-24) | `deviation/SpreadBasedP
          +edFilter` (`K`, `NORMAL_FLOOR`, `NORMAL_CAP`, `UNLOCK_FLOOR`, `
-         +UNLOCK_CAP`, `UNLOCK_WINDOW`, each citing `proposal.md`; `sprea
+         +UNLOCK_CAP`, `UNLOCK_WINDOW`, each citing `../../../proposal.md`; `sprea
          +d` is the only division, DECIMAL128; the comparison is division
-+-free; the limit is never rounded); `cli/Main` picks it when `-
+  +-free; the limit is never rounded); `cli/Main` picks it when `-
          +-new-ped` is given | `SpreadBasedPedFilterTest` (sample limit 3
-+.99%, clamps to floor and cap, exact boundaries, window start i
-+ncluded and `start + 48h` excluded, several events, `T24`, no o
-+verflow near `Instant.MAX`), `SpreadBasedPedFilterPropertyTest`
+  +.99%, clamps to floor and cap, exact boundaries, window start i
+  +ncluded and `start + 48h` excluded, several events, `T24`, no o
+  +verflow near `Instant.MAX`), `SpreadBasedPedFilterPropertyTest`
 + (never more permissive than 5%; the window only excludes more;
-+ limit = clamp(k·S); division oracle; order independence), `Mai
++ limit = clamp (k·S); division oracle; order independence), `Mai
          +nTest` (flag before or after the path, sample unchanged at 100.
-+23, `data/new-ped.json` differs with and without the flag); mut
-+ation-checked (`>` to `>=`, window end `<` to `<=`) |          
+  +23, `../../../data/new-ped.json` differs with and without the flag); mut
+  +ation-checked (`>` to `>=`, window end `<` to `<=`) |          
 98 +| N.2 | Brief Task 2 | Without `--new-ped`, the original 5% rul
-+e (2.12, 2.13) stays, and `unlockEvents` is ignored (D-04) | `c
+  +e (2.12, 2.13) stays, and `unlockEvents` is ignored (D-04) | `c
          +li/Main` runs `result/ObsiCalculator` with `StaticPedFilter` wh
-+en the flag is absent; `input/InputParser.parse(path, false)` d
-+oes not read `unlockEvents` | `MainTest`, `GoldenTest`, `ObsiCa
+  +en the flag is absent; `input/InputParser.parse(path, false)` d
+  +oes not read `unlockEvents` | `MainTest`, `GoldenTest`, `ObsiCa
          +lculatorTest` (custom filter), `UnlockEventsInputTest` (malform
-+ed or well-formed `unlockEvents` is ignored without the flag),
-+`MainTest` (malformed `unlockEvents` publishes without the flag
-+) |                                                            
+  +ed or well-formed `unlockEvents` is ignored without the flag),
+  +`MainTest` (malformed `unlockEvents` publishes without the flag
+  +) |                                                            
 99 +| N.3 | Brief Task 2 | New or changed input fields are document
-+ed in `proposal.md` with a sample in `data/new-ped.json`; if no
-+thing changes, `data/new-ped.json` is a copy of `data/sample-in
+  +ed in `proposal.md` with a sample in `data/new-ped.json`; if no
+  +thing changes, `data/new-ped.json` is a copy of `data/sample-in
          +put.json` | `proposal.md` "Input change" documents the optional
 + `unlockEvents: [{"start": ...}]`; `input/InputParser.readUnloc
          +kEvents` reads and validates it with `--new-ped` only (D-23: a
-+malformed value is an input error, exit 2); `data/new-ped.json`
+  +malformed value is an input error, exit 2); `../../../data/new-ped.json`
 + = the sample + `unlockEvents` covering its `calculationTime` +
 + exchange Epsilon (kept by the 5% rule, excluded by the unlock
 +band) | `UnlockEventsInputTest`, `MainTest` (`data/new-ped.json
@@ -2553,7 +2553,7 @@ hand |
 81  | --- | --- | --- | --- | --- |
 82  | C.1 | Brief CLI | Java 25; takes one local JSON path (D-10) |
 `cli/CliArgs` (`[--new-ped] <path>`, flag before or after; D-1
-0, D-22), `cli/Main`; `pom.xml` (release 25, enforcer) | `CliAr
+0, D-22), `cli/Main`; `../../../pom.xml` (release 25, enforcer) | `CliAr
           gsTest`, `MainTest` (usage errors) |
 83 -| C.2 | Brief CLI | `./run.sh data/sample-input.json` and `./ru
          -n.sh --new-ped data/new-ped.json` work offline with only Java 2
