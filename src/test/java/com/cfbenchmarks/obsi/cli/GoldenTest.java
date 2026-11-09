@@ -3,7 +3,6 @@ package com.cfbenchmarks.obsi.cli;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -54,7 +53,6 @@ class GoldenTest {
         return name.substring(0, name.length() - ".json".length());
     }
 
-    @Tag("wip")
     @ParameterizedTest(name = "{0}")
     @MethodSource("goldenPairs")
     void producesTheExpectedResult(Path input, Path expected) throws Exception {

@@ -11,7 +11,7 @@
 - Write tests before code. A test written ahead of its implementation gets `@Tag("wip")`. Remove the tag once it passes.
 - Property-style tests: JUnit `@ParameterizedTest` with inputs from a `java.util.Random` with a fixed seed, so every run is deterministic. No property-testing library.
 - Fast tests: `./mvnw -q test -DexcludedGroups=slow,wip`. Full suite: `./build.sh`. The Stop hook runs `verify -DexcludedGroups=wip`.
-- Hooks: if one blocks a command, stop and report it, and don't rewrite the command around the block. Reads (Read, and Glob/Grep when they exist) are always allowed, protected files included. Edit files with Edit/Write, never `sed -i` or other Bash rewrites. The guard matches "expected" and the spec's file name anywhere in a Bash command, so keep them out of grep patterns and filters.
+- Hooks: if a block came from breaking a rule in this file, you may rerun once in a compliant form and report it. Any other block: stop and ask, and don't rewrite the command around it. Reads (Read, and Glob/Grep when they exist) are always allowed, protected files included. Edit files with Edit/Write, never `sed -i` or other Bash rewrites. The guard matches "expected" and the spec's file name anywhere in a Bash command, so keep them out of grep patterns and filters.
 
 ## I/O
 - Results go to stdout as JSON. Errors go to stderr as JSON. Nothing else goes to stdout.

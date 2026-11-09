@@ -200,6 +200,42 @@ takes a maximum over every sample, which on a deep book is a long walk.
   that is inherent to "no crossing before a curve ends". Listed as a production gap for the README.
 - Status: Decided (resolved by the user)
 
+### D-22 CLI wiring: usage errors, unexpected errors, encoding and `run.sh`
+D-08 fixes the exit codes and D-10 the argument form. Open were the wording of usage errors, what an
+unexpected error reports, and a few wiring details the brief does not cover.
+- Spec: none (CLI behaviour: brief, "CLI" and "Output"); D-07, D-08, D-09, D-10.
+- Decision:
+  - Usage errors (exit 2, `calculationTime` null) are prefixed `usage error: `: `missing input path`,
+    `more than one input path`, `unknown option <arg>`, `invalid input path` (a string the system cannot name as
+    a path), each with `(usage: [--new-ped] <path>)` where it helps. The arguments are checked before the file is
+    read, in this order: an unknown option, then the path count, then `--new-ped`.
+  - Until Task 2, `--new-ped` is recognised and refused with exit 2 and
+    `usage error: --new-ped is not implemented yet`, wherever it appears and even if the path is bad. Giving it
+    twice is the same as once.
+  - An unexpected error (exit 3) reports `internal error: <SimpleClassName>: <message>`, with the message omitted
+    when null, newlines replaced by spaces, and the whole reason cut at 200 characters. `calculationTime` is
+    echoed if the input had already been accepted, otherwise null.
+  - The catch-all in `Main` catches `Throwable`, not only `Exception`, so an `Error` such as a stack overflow
+    also ends as failure JSON and never a stack trace. This is best effort: under a real `OutOfMemoryError`,
+    building or printing the JSON may itself fail, and then only the exit code 3 is left.
+  - A `PrintStream` never throws, so after writing the result `Main` checks `out.checkError()`. If stdout
+    could not be written (a closed pipe, say) the result was not published: the exit code is 3 and the reason
+    `internal error: could not write the result to stdout` goes to stderr, best effort (if stderr is broken
+    too, only the exit code is left). The write is not retried, and bytes that did get through before the
+    error stay written.
+  - A result is built completely before anything is written, so stdout never holds part of a result. Each
+    stream gets one JSON object on one line ended by a single `\n` (not the platform line separator).
+  - `main()` writes through UTF-8 `PrintStream`s, so exchange names come out as given whatever the platform's
+    default encoding.
+  - `run.sh` exits 3 (not 2) when `target/obsi.jar` is missing, as D-08 says.
+- Rationale: a caller can tell bad usage from bad data from a bug by the exit code and the prefix, and the
+  one-JSON-object contract (D-09) holds on every path. Echoing `calculationTime` where it is known helps whoever
+  reads an internal error, and D-07 only requires null for input errors.
+- Not covered: the uncrossing-exhausted failure (D-20) cannot be reached through the CLI, so it has no CLI test;
+  `ObsiCalculator` passes its reason through. A `--` end-of-options marker is not supported, so an input path
+  cannot start with `-`.
+- Status: Decided (resolved by the user)
+
 ## Output and CLI
 
 ### D-08 Exit codes and `reason`
