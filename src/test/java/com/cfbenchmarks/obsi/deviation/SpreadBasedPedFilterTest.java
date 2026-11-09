@@ -307,6 +307,22 @@ class SpreadBasedPedFilterTest {
         assertThat(excluded(snapshot, tight("100.7"))).containsExactly("C");
     }
 
+    /**
+     * P.2, as {@code StaticPedFilterTest.theFilterKeepsNoStateBetweenSnapshots}: no state between calls. One filter
+     * instance sees a snapshot inside an unlock window, then one outside it, then inside again. The middle result uses
+     * the normal band, so the unlock band left nothing behind, and the third is the same as the first.
+     */
+    @Test
+    void theFilterKeepsNoStateBetweenSnapshots() {
+        ValidBook[] books = tight("100.7");   // C is 0.7% from the median: out at the 0.5% unlock floor, in at the 1% floor
+        Snapshot inside = snapshotAt("2026-10-27T12:00:00Z", "2026-10-26T12:00:00Z");
+        Snapshot outside = snapshotAt("2026-10-29T12:00:00Z", "2026-10-26T12:00:00Z");   // start + 48h is 10-28T12:00
+
+        assertThat(excluded(inside, books)).containsExactly("C");
+        assertThat(excluded(outside, books)).isEmpty();   // normal band: the unlock band is not carried over
+        assertThat(excluded(inside, books)).containsExactly("C");
+    }
+
     /** 13. T24:00:00Z is next-day midnight (D-15), and a start at the end of time must not overflow. */
     @Test
     void t24IsReadAsNextDayMidnight() {
